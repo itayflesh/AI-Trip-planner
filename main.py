@@ -7,7 +7,7 @@ openai_api_key = "sk-proj-wQ4taTDDFhbuDrmkqIlOT3BlbkFJlJVo8Zlx0wucOcJ2atou"
 openai_api_model = "gpt-3.5-turbo"
 
 # Set up SerpAPI API credentials
-serpapi_api_key = "8c584f8e82f0a0e913e3398f17bad84f7ff22dbdcae6ba5774070fb971307443"
+serpapi_api_key = "15cfee1179394db2e612cf7d47ae8b74563d5b07a27c6d2fbc50db4f6967994e"
 
 # Function to get destination suggestions from OpenAI ChatGPT
 def get_destination_suggestions(trip_month, trip_type):
@@ -77,7 +77,6 @@ def get_flight_price_insights(departure_id, arrival_id, start_date, end_date):
         return None
 
 # Function to find the most expensive hotel within the user's budget
-# Function to find the most expensive hotel within the user's budget
 def find_most_expensive_hotel(destination, check_in_date, check_out_date, max_price, num_days):
     params = {
         "engine": "google_hotels",
@@ -97,6 +96,14 @@ def find_most_expensive_hotel(destination, check_in_date, check_out_date, max_pr
     
     max_price_per_night = max_price / num_days
     
+    if not properties:
+        return "No hotels found for the given destination and dates."
+    
+    cheapest_hotel = properties[0]
+    cheapest_rate_per_night = cheapest_hotel.get("rate_per_night", {}).get("extracted_lowest", 0)
+    
+    if cheapest_rate_per_night > max_price_per_night:
+        return "The budget is not enough for flight and hotel."
     
     highest_price_hotel = None
     highest_price = 0
@@ -105,7 +112,6 @@ def find_most_expensive_hotel(destination, check_in_date, check_out_date, max_pr
         for property in properties:
             rate_per_night = property.get("rate_per_night", {})
             extracted_lowest = rate_per_night.get("extracted_lowest", 0)
-            print(extracted_lowest)
             
             if extracted_lowest <= max_price_per_night:
                 if extracted_lowest > highest_price:
@@ -152,6 +158,8 @@ trip_month = start_date.strftime("%B")
 
 # Get destination suggestions from OpenAI ChatGPT
 destination_suggestions = get_destination_suggestions(trip_month, trip_type)
+
+print(destination_suggestions)
 
 # Create a dictionary to store destination details
 destination_details = {}
