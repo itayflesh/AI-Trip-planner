@@ -7,7 +7,7 @@ openai_api_key = "sk-proj-wQ4taTDDFhbuDrmkqIlOT3BlbkFJlJVo8Zlx0wucOcJ2atou"
 openai_api_model = "gpt-3.5-turbo"
 
 # Set up SerpAPI API credentials
-serpapi_api_key = "15cfee1179394db2e612cf7d47ae8b74563d5b07a27c6d2fbc50db4f6967994e"
+serpapi_api_key = "30c976628a21ad91c354a84dfd3054b0ece66864fe19e21df5cefa6c46e910ed"
 
 # Function to get destination suggestions from OpenAI ChatGPT
 def get_destination_suggestions(trip_month, trip_type):
