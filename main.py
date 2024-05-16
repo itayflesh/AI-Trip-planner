@@ -7,7 +7,7 @@ openai_api_key = "sk-proj-wQ4taTDDFhbuDrmkqIlOT3BlbkFJlJVo8Zlx0wucOcJ2atou"
 openai_api_model = "gpt-3.5-turbo"
 
 # Set up SerpAPI API credentials
-serpapi_api_key = "30c976628a21ad91c354a84dfd3054b0ece66864fe19e21df5cefa6c46e910ed"
+serpapi_api_key = "696b9357afea8916abd341270a4c817638dfdc640a6e415902d317e9fe18a393"
 
 # Function to get destination suggestions from OpenAI ChatGPT
 def get_destination_suggestions(trip_month, trip_type):
@@ -86,7 +86,7 @@ def find_most_expensive_hotel(destination, check_in_date, check_out_date, max_pr
         "adults": "1",
         "currency": "USD",
         "hl": "en",
-        "gl": "il" ,
+        "gl": "il",
         "sort_by": "3",  # Sort by lowest price
         "api_key": serpapi_api_key
     }
@@ -107,31 +107,19 @@ def find_most_expensive_hotel(destination, check_in_date, check_out_date, max_pr
     highest_price_hotel = None
     highest_price = 0
     
-    while True:
-        for property in properties:
-            price = property.get("total_rate", {})
-            extracted_lowest = price.get("extracted_lowest", 0)
-            
-            if extracted_lowest <= max_price:
-                if extracted_lowest > highest_price:
-                    highest_price_hotel = {
-                        "name": property.get("name"),
-                        "total_rate": extracted_lowest
-                    }
-                    highest_price = extracted_lowest
-            else:
-                # Hotel price exceeds the maximum price per night, break the loop
-                return highest_price_hotel
+    for property in properties:
+        price = property.get("total_rate", {})
+        extracted_lowest = price.get("extracted_lowest", 0)
         
-        pagination = results.get("serpapi_pagination", {})
-        next_page_token = pagination.get("next_page_token")
-        
-        if next_page_token:
-            params["next_page_token"] = next_page_token
-            search = GoogleSearch(params)
-            results = search.get_dict()
-            properties = results.get("properties", [])
+        if extracted_lowest <= max_price:
+            if extracted_lowest > highest_price:
+                highest_price_hotel = {
+                    "name": property.get("name"),
+                    "total_rate": extracted_lowest
+                }
+                highest_price = extracted_lowest
         else:
+            # Hotel price exceeds the maximum price, break the loop
             break
     
     return highest_price_hotel
@@ -141,7 +129,7 @@ def generate_daily_plan(destination_name, start_date, end_date, trip_type):
     messages = [
         {
             "role": "system",
-            "content": f"Create a daily plan for a trip to {destination_name} from {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')} for a {trip_type} trip. Also, provide a one-sentence that will start with the word Summary that wiil highlighting the main activities of the trip."
+            "content": f"Create a daily plan for a trip to {destination_name} from {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')} for a {trip_type} trip. Format your response as follows:\n\nDaily Plan:\n[Detailed daily plan]\n\nSummary: [One-sentence summary highlighting the main activities of the trip]"
         }
     ]
     
@@ -161,8 +149,14 @@ def generate_daily_plan(destination_name, start_date, end_date, trip_type):
         if response.status_code == 200:
             data = response.json()
             content = data["choices"][0]["message"]["content"].strip()
-            daily_plan, summary = content.split("\n\nSummary: ")
-            return daily_plan.strip(), summary.strip()
+            
+            if "Daily Plan:" in content and "Summary:" in content:
+                daily_plan, summary = content.split("Summary:")
+                daily_plan = daily_plan.replace("Daily Plan:", "").strip()
+                summary = summary.strip()
+                return daily_plan, summary
+            else:
+                raise Exception("Unexpected response format from OpenAI ChatGPT.")
         else:
             print(response.status_code)
             raise Exception("Failed to generate daily plan.")
@@ -221,77 +215,85 @@ except ValueError:
 # Extract the month from the start date
 trip_month = start_date.strftime("%B")
 
-# # Get destination suggestions from OpenAI ChatGPT
-# destination_suggestions = get_destination_suggestions(trip_month, trip_type)
+# Get destination suggestions from OpenAI ChatGPT
+destination_suggestions = get_destination_suggestions(trip_month, trip_type)
 
-# # Create a dictionary to store destination details
-# destination_details = {}
+# Create a dictionary to store destination details
+destination_details = {}
 
-# # Extract airport codes and destination names from destination suggestions
-# for suggestion in destination_suggestions:
-#     airport_code, destination_name = suggestion.split(":")
-#     airport_code = airport_code.split()[-1]
-#     destination_details[airport_code] = {"name": destination_name.strip()}
+# Extract airport codes and destination names from destination suggestions
+for suggestion in destination_suggestions:
+    airport_code, destination_name = suggestion.split(":")
+    airport_code = airport_code.split()[-1]
+    destination_details[airport_code] = {"name": destination_name.strip()}
 
-# # Get flight price insights and find the most expensive hotel for each destination
-# for airport_code, details in destination_details.items():
-#     destination_name = details["name"]
+# Get flight price insights and find the most expensive hotel for each destination
+for airport_code, details in destination_details.items():
+    destination_name = details["name"]
     
-#     # Get flight price insights
-#     flight_price = get_flight_price_insights("TLV", airport_code, start_date, end_date)
-#     if flight_price is not None:
-#         details["flight_price"] = flight_price
+    # Get flight price insights
+    flight_price = get_flight_price_insights("TLV", airport_code, start_date, end_date)
+    if flight_price is not None:
+        details["flight_price"] = flight_price
         
-#         # Calculate the maximum price for hotels
-#         max_hotel_price = budget - flight_price
-        
-#         # Find the most expensive hotel within the user's budget
-#         hotel = find_most_expensive_hotel(destination_name, start_date, end_date, max_hotel_price, num_days)
-#         if hotel:
-#             details["hotel_name"] = hotel["name"]
-#             details["hotel_Price"] = hotel["total_rate"]
+        if flight_price > budget:
+            details["message"] = "The flight price alone exceeds the entire budget."
+        else:
+            # Calculate the maximum price for hotels
+            max_hotel_price = budget - flight_price
+            
+            # Find the most expensive hotel within the user's budget
+            hotel = find_most_expensive_hotel(destination_name, start_date, end_date, max_hotel_price, num_days)
+            if hotel:
+                details["hotel_name"] = hotel["name"]
+                details["hotel_Price"] = hotel["total_rate"]
+            else:
+                details["message"] = "No suitable hotels found within the remaining budget."
+    else:
+        details["message"] = "Failed to retrieve flight price insights."
+
 
 # delete from here
             
-# Create fake destination data for testing
-fake_destination_details = {
-    "MLE": {
-        "name": "Maldives",
-        "flight_price": 1200,
-        "hotel_name": "Soneva Fushi",
-        "hotel_Price": 2000
-    },
-    "HNL": {
-        "name": "Honolulu, Hawaii",
-        "flight_price": 1000,
-        "hotel_name": "The Royal Hawaiian",
-        "hotel_Price": 1500
-    },
-    "CUN": {
-        "name": "Cancun, Mexico",
-        "flight_price": 800,
-        "hotel_name": "The Ritz-Carlton, Cancun",
-        "hotel_Price": 1200
-    },
-    "PUJ": {
-        "name": "Punta Cana, Dominican Republic",
-        "flight_price": 900,
-        "hotel_name": "Paradisus Palma Real Golf & Spa Resort",
-        "hotel_Price": 1100
-    },
-    "PPT": {
-        "name": "Bora Bora, French Polynesia",
-        "flight_price": 1800,
-        "hotel_name": "Four Seasons Resort Bora Bora",
-        "hotel_Price": 2500
-    }
-}
+# # Create fake destination data for testing
+# fake_destination_details = {
+#     "MLE": {
+#         "name": "Maldives",
+#         "flight_price": 1200,
+#         "hotel_name": "Soneva Fushi",
+#         "hotel_Price": 2000
+#     },
+#     "HNL": {
+#         "name": "Honolulu, Hawaii",
+#         "flight_price": 1000,
+#         "hotel_name": "The Royal Hawaiian",
+#         "hotel_Price": 1500
+#     },
+#     "CUN": {
+#         "name": "Cancun, Mexico",
+#         "flight_price": 800,
+#         "hotel_name": "The Ritz-Carlton, Cancun",
+#         "hotel_Price": 1200
+#     },
+#     "PUJ": {
+#         "name": "Punta Cana, Dominican Republic",
+#         "flight_price": 900,
+#         "hotel_name": "Paradisus Palma Real Golf & Spa Resort",
+#         "hotel_Price": 1100
+#     },
+#     "PPT": {
+#         "name": "Bora Bora, French Polynesia",
+#         "flight_price": 1800,
+#         "hotel_name": "Four Seasons Resort Bora Bora",
+#         "hotel_Price": 2500
+#     }
+# }
 
-destination_details = fake_destination_details
+# destination_details = fake_destination_details
 
 # to here
 
-# Print the destination details with flight price and hotel information
+# Print the destination details with flight price, hotel information, and messages
 print("Destination Details:")
 for index, (airport_code, details) in enumerate(destination_details.items(), start=1):
     destination_name = details["name"]
@@ -299,13 +301,17 @@ for index, (airport_code, details) in enumerate(destination_details.items(), sta
     hotel_name = details.get("hotel_name", "N/A")
     hotel_Price = details.get("hotel_Price", "N/A")
     total_price = flight_price + hotel_Price if flight_price != "N/A" and hotel_Price != "N/A" else "N/A"
+    message = details.get("message", "")
     
     print(f"{index}. {destination_name} ({airport_code}):")
     print(f"   Flight Price: ${flight_price}")
     print(f"   Hotel Name: {hotel_name}")
     print(f"   Hotel Price: ${hotel_Price}")
     print(f"   Total Price: ${total_price}")
+    if message:
+        print(f"   Message: {message}")
     print()
+
 
 # Prompt the user to choose a destination
 choice = int(input("Enter the number of your desired destination: "))
