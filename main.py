@@ -1,45 +1,31 @@
 import requests
 from serpapi import GoogleSearch
 from datetime import datetime
+from openai import OpenAI
 
 # Set up OpenAI API credentials
 openai_api_key = "sk-proj-wQ4taTDDFhbuDrmkqIlOT3BlbkFJlJVo8Zlx0wucOcJ2atou"
 openai_api_model = "gpt-3.5-turbo"
+openai = OpenAI(api_key=openai_api_key)
 
 # Set up SerpAPI API credentials
 serpapi_api_key = "696b9357afea8916abd341270a4c817638dfdc640a6e415902d317e9fe18a393"
 
 # Function to get destination suggestions from OpenAI ChatGPT
 def get_destination_suggestions(trip_month, trip_type):
-    messages = [
-        {
-            "role": "system",
-            "content": f"Suggest 5 best places to visit in the month of {trip_month} for a {trip_type} trip. Start each location with the arrival airport code in uppercase, followed by a colon and the destination name."
-        }
-    ]
+    prompt = f"Suggest 5 best places to visit in the month of {trip_month} for a {trip_type} trip. Start each location with the arrival airport code in uppercase, followed by a colon and the destination name."
     
     try:
-        response = requests.post(
-            "https://api.openai.com/v1/chat/completions",
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {openai_api_key}"
-            },
-            json={
-                "messages": messages,
-                "model": openai_api_model
-            }
+        response = openai.chat.completions.create(
+            model=openai_api_model,
+            messages=[
+                {"role": "system", "content": prompt}
+            ]
         )
         
-        if response.status_code == 200:
-            data = response.json()
-            suggestion_text = data["choices"][0]["message"]["content"].strip()
-            suggestions = suggestion_text.split("\n")
-            return suggestions
-        elif response.status_code == 401:
-            raise Exception("Looks like your OpenAI API key is incorrect. Please check your API key and try again.")
-        else:
-            raise Exception(f"Failed to fetch from OpenAI API. Status code: {response.status_code}")
+        suggestion_text = response.choices[0].message.content.strip()
+        suggestions = suggestion_text.split("\n")
+        return suggestions
     
     except Exception as e:
         print(f"Error: {str(e)}")
@@ -126,40 +112,25 @@ def find_most_expensive_hotel(destination, check_in_date, check_out_date, max_pr
 
 # Function to generate daily plan using OpenAI ChatGPT
 def generate_daily_plan(destination_name, start_date, end_date, trip_type):
-    messages = [
-        {
-            "role": "system",
-            "content": f"Create a daily plan for a trip to {destination_name} from {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')} for a {trip_type} trip. Format your response as follows:\n\nDaily Plan:\n[Detailed daily plan]\n\nSummary: [One-sentence summary highlighting the main activities of the trip]"
-        }
-    ]
+    prompt = f"Create a daily plan for a trip to {destination_name} from {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')} for a {trip_type} trip. Format your response as follows:\n\nDaily Plan:\n[Detailed daily plan]\n\nSummary: [One-sentence summary highlighting the main activities of the trip]"
     
     try:
-        response = requests.post(
-            "https://api.openai.com/v1/chat/completions",
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {openai_api_key}"
-            },
-            json={
-                "messages": messages,
-                "model": openai_api_model
-            }
+        response = openai.chat.completions.create(
+            model=openai_api_model,
+            messages=[
+                {"role": "system", "content": prompt}
+            ]
         )
         
-        if response.status_code == 200:
-            data = response.json()
-            content = data["choices"][0]["message"]["content"].strip()
-            
-            if "Daily Plan:" in content and "Summary:" in content:
-                daily_plan, summary = content.split("Summary:")
-                daily_plan = daily_plan.replace("Daily Plan:", "").strip()
-                summary = summary.strip()
-                return daily_plan, summary
-            else:
-                raise Exception("Unexpected response format from OpenAI ChatGPT.")
+        content = response.choices[0].message.content.strip()
+        
+        if "Daily Plan:" in content and "Summary:" in content:
+            daily_plan, summary = content.split("Summary:")
+            daily_plan = daily_plan.replace("Daily Plan:", "").strip()
+            summary = summary.strip()
+            return daily_plan, summary
         else:
-            print(response.status_code)
-            raise Exception("Failed to generate daily plan.")
+            raise Exception("Unexpected response format from OpenAI ChatGPT.")
     
     except Exception as e:
         print(f"Error: {str(e)}")
@@ -168,31 +139,14 @@ def generate_daily_plan(destination_name, start_date, end_date, trip_type):
 # Function to generate trip images using OpenAI's DALL-E API
 def generate_trip_images(destination_name, trip_month, trip_type, summary):
     prompt = f"Create 4 different images that showcase a {trip_type} trip to {destination_name} in month: {trip_month}, the 4 images should be inspired by the following trip summary: {summary}"
-    print(prompt)
     
-    response = requests.post(
-        "https://api.openai.com/v1/images/generations",
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {openai_api_key}"
-        },
-        json={
-            "prompt": prompt,
-            "n": 4,
-            "size": "1024x1024"
-        }
+    response = openai.images.generate(
+        prompt=prompt,
+        n=4,
+        size="1024x1024"
     )
     
-    image_urls = []
-    
-    if response.status_code == 200:
-        data = response.json()["data"]
-        for item in data:
-            image_url = item["url"]
-            image_urls.append(image_url)
-    else:
-        print(response.status_code)
-        print("Failed to generate trip images.")
+    image_urls = [image.url for image in response.data]
     
     return image_urls
 
@@ -252,47 +206,6 @@ for airport_code, details in destination_details.items():
     else:
         details["message"] = "Failed to retrieve flight price insights."
 
-
-# delete from here
-            
-# # Create fake destination data for testing
-# fake_destination_details = {
-#     "MLE": {
-#         "name": "Maldives",
-#         "flight_price": 1200,
-#         "hotel_name": "Soneva Fushi",
-#         "hotel_Price": 2000
-#     },
-#     "HNL": {
-#         "name": "Honolulu, Hawaii",
-#         "flight_price": 1000,
-#         "hotel_name": "The Royal Hawaiian",
-#         "hotel_Price": 1500
-#     },
-#     "CUN": {
-#         "name": "Cancun, Mexico",
-#         "flight_price": 800,
-#         "hotel_name": "The Ritz-Carlton, Cancun",
-#         "hotel_Price": 1200
-#     },
-#     "PUJ": {
-#         "name": "Punta Cana, Dominican Republic",
-#         "flight_price": 900,
-#         "hotel_name": "Paradisus Palma Real Golf & Spa Resort",
-#         "hotel_Price": 1100
-#     },
-#     "PPT": {
-#         "name": "Bora Bora, French Polynesia",
-#         "flight_price": 1800,
-#         "hotel_name": "Four Seasons Resort Bora Bora",
-#         "hotel_Price": 2500
-#     }
-# }
-
-# destination_details = fake_destination_details
-
-# to here
-
 # Print the destination details with flight price, hotel information, and messages
 print("Destination Details:")
 for index, (airport_code, details) in enumerate(destination_details.items(), start=1):
@@ -311,7 +224,6 @@ for index, (airport_code, details) in enumerate(destination_details.items(), sta
     if message:
         print(f"   Message: {message}")
     print()
-
 
 # Prompt the user to choose a destination
 choice = int(input("Enter the number of your desired destination: "))
