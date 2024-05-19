@@ -1,7 +1,26 @@
+from fastapi import FastAPI
+from pydantic import BaseModel
+from fastapi.middleware.cors import CORSMiddleware
 import requests
 from serpapi import GoogleSearch
 from datetime import datetime
 from openai import OpenAI
+
+app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+class TripInput(BaseModel):
+    start_date: str
+    end_date: str
+    budget: float
+    trip_type: str
 
 # Set up OpenAI API credentials
 openai_api_key = "sk-proj-wQ4taTDDFhbuDrmkqIlOT3BlbkFJlJVo8Zlx0wucOcJ2atou"
@@ -150,107 +169,68 @@ def generate_trip_images(destination_name, trip_month, trip_type, summary):
     
     return image_urls
 
-# Get user input
-date_template = "YYYY-MM-DD"  # Template for the date format
-start_date_str = input(f"Enter the start date of your trip ({date_template}): ")
-end_date_str = input(f"Enter the end date of your trip ({date_template}): ")
-budget = float(input("Enter your total budget in USD for the trip (hotel+flights): "))
-trip_type = input("Enter the type of trip (ski/beach/city): ")
+@app.post("/destinations")
+async def get_destinations(trip_input: TripInput):
+    start_date_str = trip_input.start_date
+    end_date_str = trip_input.end_date
+    budget = trip_input.budget
+    trip_type = trip_input.trip_type
 
-# Convert start and end dates to datetime objects
-try:
-    start_date = datetime.strptime(start_date_str, "%Y-%m-%d")
-    end_date = datetime.strptime(end_date_str, "%Y-%m-%d")
-    num_days = (end_date - start_date).days
-except ValueError:
-    print(f"Invalid date format. Please enter dates in the format: {date_template}")
-    exit()
+    try:
+        start_date = datetime.strptime(start_date_str, "%Y-%m-%d")
+        end_date = datetime.strptime(end_date_str, "%Y-%m-%d")
+        num_days = (end_date - start_date).days
+    except ValueError:
+        return {"error": "Invalid date format. Please enter dates in the format: YYYY-MM-DD"}
 
-# Extract the month from the start date
-trip_month = start_date.strftime("%B")
+    trip_month = start_date.strftime("%B")
 
-# Get destination suggestions from OpenAI ChatGPT
-destination_suggestions = get_destination_suggestions(trip_month, trip_type)
+    destination_suggestions = get_destination_suggestions(trip_month, trip_type)
+    destination_details = {}
 
-# Create a dictionary to store destination details
-destination_details = {}
+    for suggestion in destination_suggestions:
+        airport_code, destination_name = suggestion.split(":")
+        airport_code = airport_code.split()[-1]
+        destination_details[airport_code] = {"name": destination_name.strip()}
 
-# Extract airport codes and destination names from destination suggestions
-for suggestion in destination_suggestions:
-    airport_code, destination_name = suggestion.split(":")
-    airport_code = airport_code.split()[-1]
-    destination_details[airport_code] = {"name": destination_name.strip()}
-
-# Get flight price insights and find the most expensive hotel for each destination
-for airport_code, details in destination_details.items():
-    destination_name = details["name"]
-    
-    # Get flight price insights
-    flight_price = get_flight_price_insights("TLV", airport_code, start_date, end_date)
-    if flight_price is not None:
-        details["flight_price"] = flight_price
-        
-        if flight_price > budget:
-            details["message"] = "The flight price alone exceeds the entire budget."
-        else:
-            # Calculate the maximum price for hotels
-            max_hotel_price = budget - flight_price
-            
-            # Find the most expensive hotel within the user's budget
-            hotel = find_most_expensive_hotel(destination_name, start_date, end_date, max_hotel_price, num_days)
-            if hotel:
-                details["hotel_name"] = hotel["name"]
-                details["hotel_Price"] = hotel["total_rate"]
+    for airport_code, details in destination_details.items():
+        destination_name = details["name"]
+        flight_price = get_flight_price_insights("TLV", airport_code, start_date, end_date)
+        if flight_price is not None:
+            details["flight_price"] = flight_price
+            if flight_price > budget:
+                details["message"] = "The flight price alone exceeds the entire budget."
             else:
-                details["message"] = "No suitable hotels found within the remaining budget."
-    else:
-        details["message"] = "Failed to retrieve flight price insights."
-
-# Print the destination details with flight price, hotel information, and messages
-print("Destination Details:")
-for index, (airport_code, details) in enumerate(destination_details.items(), start=1):
-    destination_name = details["name"]
-    flight_price = details.get("flight_price", "N/A")
-    hotel_name = details.get("hotel_name", "N/A")
-    hotel_Price = details.get("hotel_Price", "N/A")
-    total_price = flight_price + hotel_Price if flight_price != "N/A" and hotel_Price != "N/A" else "N/A"
-    message = details.get("message", "")
-    
-    print(f"{index}. {destination_name} ({airport_code}):")
-    print(f"   Flight Price: ${flight_price}")
-    print(f"   Hotel Name: {hotel_name}")
-    print(f"   Hotel Price: ${hotel_Price}")
-    print(f"   Total Price: ${total_price}")
-    if message:
-        print(f"   Message: {message}")
-    print()
-
-# Prompt the user to choose a destination
-choice = int(input("Enter the number of your desired destination: "))
-
-if 1 <= choice <= len(destination_details):
-    selected_destination = list(destination_details.values())[choice - 1]
-    destination_name = selected_destination["name"]
-    
-    # Generate daily plan
-    daily_plan, summary = generate_daily_plan(destination_name, start_date, end_date, trip_type)
-
-    if daily_plan:
-        print(f"\nDaily Plan for {destination_name}:")
-        print(daily_plan)
-        print(f"\nTrip Summary: {summary}")
-        
-        # Generate trip images
-        image_urls = generate_trip_images(destination_name, trip_month, trip_type, summary)
-        
-        if image_urls:
-            print("\nTrip Images:")
-            for i, url in enumerate(image_urls, start=1):
-                print(f"Image {i}: {url}")
+                max_hotel_price = budget - flight_price
+                hotel = find_most_expensive_hotel(destination_name, start_date, end_date, max_hotel_price, num_days)
+                if hotel:
+                    details["hotel_name"] = hotel["name"]
+                    details["hotel_price"] = hotel["total_rate"]
+                else:
+                    details["message"] = "No suitable hotels found within the remaining budget."
         else:
-            print("Failed to generate trip images.")
-    else:
-        print("Failed to generate daily plan.")
+            details["message"] = "Failed to retrieve flight price insights."
 
-else:
-    print("Invalid choice. Please enter a valid number.")
+    return {"destination_details": destination_details}
+
+@app.post("/daily-plan")
+async def get_daily_plan(destination_name: str, start_date: str, end_date: str, trip_type: str):
+    try:
+        start_date_obj = datetime.strptime(start_date, "%Y-%m-%d")
+        end_date_obj = datetime.strptime(end_date, "%Y-%m-%d")
+    except ValueError:
+        return {"error": "Invalid date format. Please enter dates in the format: YYYY-MM-DD"}
+
+    daily_plan, summary = generate_daily_plan(destination_name, start_date_obj, end_date_obj, trip_type)
+    if daily_plan:
+        return {"daily_plan": daily_plan, "summary": summary}
+    else:
+        return {"error": "Failed to generate daily plan."}
+
+@app.post("/trip-images")
+async def get_trip_images(destination_name: str, trip_month: str, trip_type: str, summary: str):
+    image_urls = generate_trip_images(destination_name, trip_month, trip_type, summary)
+    if image_urls:
+        return {"image_urls": image_urls}
+    else:
+        return {"error": "Failed to generate trip images."}
