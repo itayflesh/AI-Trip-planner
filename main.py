@@ -131,7 +131,7 @@ def find_most_expensive_hotel(destination, check_in_date, check_out_date, max_pr
 
 # Function to generate daily plan using OpenAI ChatGPT
 def generate_daily_plan(destination_name, start_date, end_date, trip_type):
-    prompt = f"Create a daily plan for a trip to {destination_name} from {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')} for a {trip_type} trip. Format your response as follows:\n\nDaily Plan:\n[Detailed daily plan - start each day with his number below each activity in different line]\n\nSummary: [One-sentence summary highlighting the main activities of the trip]"
+    prompt = f"Create a daily plan for a trip to {destination_name} from {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')} for a {trip_type} trip. Format your response as follows:\n\nDaily Plan:\n[Detailed daily plan - start each day with his number below each activity in different line]\n\nSummary: [One sentence that contains 4 visual descriptions that will help imagine what the vacation will look like]"
     
     try:
         response = openai.chat.completions.create(
@@ -157,15 +157,19 @@ def generate_daily_plan(destination_name, start_date, end_date, trip_type):
 
 # Function to generate trip images using OpenAI's DALL-E API
 def generate_trip_images(destination_name, trip_month, trip_type, summary):
-    prompt = f"Create 4 different simple images that describe a {trip_type} trip to {destination_name} in month: {trip_month}, the 4 images should be very simple (not collage) and be inspired by the following trip summary: {summary}"
+    image_urls = []
     
-    response = openai.images.generate(
-        prompt=prompt,
-        n=4,
-        size="1024x1024"
-    )
-    
-    image_urls = [image.url for image in response.data]
+    for i in range(4):
+        prompt = f"Create a single photo-realistic image that captures a specific moment or location during a {trip_type} trip to {destination_name} in the month of {trip_month}. The image should look like a photograph taken by a traveler, inspired by the following trip summary: {summary}"
+        
+        response = openai.images.generate(
+            prompt=prompt,
+            n=1,
+            size="1024x1024"
+        )
+        
+        image_url = response.data[0].url
+        image_urls.append(image_url)
     
     return image_urls
 
