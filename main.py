@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 import requests
@@ -131,7 +131,7 @@ def find_most_expensive_hotel(destination, check_in_date, check_out_date, max_pr
 
 # Function to generate daily plan using OpenAI ChatGPT
 def generate_daily_plan(destination_name, start_date, end_date, trip_type):
-    prompt = f"Create a daily plan for a trip to {destination_name} from {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')} for a {trip_type} trip. Format your response as follows:\n\nDaily Plan:\n[Detailed daily plan]\n\nSummary: [One-sentence summary highlighting the main activities of the trip]"
+    prompt = f"Create a daily plan for a trip to {destination_name} from {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')} for a {trip_type} trip. Format your response as follows:\n\nDaily Plan:\n[Detailed daily plan - start each day with his number below each activity in different line]\n\nSummary: [One-sentence summary highlighting the main activities of the trip]"
     
     try:
         response = openai.chat.completions.create(
@@ -157,7 +157,7 @@ def generate_daily_plan(destination_name, start_date, end_date, trip_type):
 
 # Function to generate trip images using OpenAI's DALL-E API
 def generate_trip_images(destination_name, trip_month, trip_type, summary):
-    prompt = f"Create 4 different images that showcase a {trip_type} trip to {destination_name} in month: {trip_month}, the 4 images should be inspired by the following trip summary: {summary}"
+    prompt = f"Create 4 different simple images that describe a {trip_type} trip to {destination_name} in month: {trip_month}, the 4 images should be very simple (not collage) and be inspired by the following trip summary: {summary}"
     
     response = openai.images.generate(
         prompt=prompt,
@@ -193,28 +193,34 @@ async def get_destinations(trip_input: TripInput):
         airport_code = airport_code.split()[-1]
         destination_details[airport_code] = {"name": destination_name.strip()}
 
-    for airport_code, details in destination_details.items():
-        destination_name = details["name"]
-        flight_price = get_flight_price_insights("TLV", airport_code, start_date, end_date)
-        if flight_price is not None:
-            details["flight_price"] = flight_price
-            if flight_price > budget:
-                details["message"] = "The flight price alone exceeds the entire budget."
-            else:
-                max_hotel_price = budget - flight_price
-                hotel = find_most_expensive_hotel(destination_name, start_date, end_date, max_hotel_price, num_days)
-                if hotel:
-                    details["hotel_name"] = hotel["name"]
-                    details["hotel_price"] = hotel["total_rate"]
-                else:
-                    details["message"] = "No suitable hotels found within the remaining budget."
-        else:
-            details["message"] = "Failed to retrieve flight price insights."
+    # for airport_code, details in destination_details.items():
+    #     destination_name = details["name"]
+    #     flight_price = get_flight_price_insights("TLV", airport_code, start_date, end_date)
+    #     if flight_price is not None:
+    #         details["flight_price"] = flight_price
+    #         if flight_price > budget:
+    #             details["message"] = "The flight price alone exceeds the entire budget."
+    #         else:
+    #             max_hotel_price = budget - flight_price
+    #             hotel = find_most_expensive_hotel(destination_name, start_date, end_date, max_hotel_price, num_days)
+    #             if hotel:
+    #                 details["hotel_name"] = hotel["name"]
+    #                 details["hotel_price"] = hotel["total_rate"]
+    #             else:
+    #                 details["message"] = "No suitable hotels found within the remaining budget."
+    #     else:
+    #         details["message"] = "Failed to retrieve flight price insights."
 
     return {"destination_details": destination_details}
 
 @app.post("/daily-plan")
-async def get_daily_plan(destination_name: str, start_date: str, end_date: str, trip_type: str):
+async def get_daily_plan(request: Request):
+    data = await request.json()
+    destination_name = data["destination_name"]
+    start_date = data["start_date"]
+    end_date = data["end_date"]
+    trip_type = data["trip_type"]
+
     try:
         start_date_obj = datetime.strptime(start_date, "%Y-%m-%d")
         end_date_obj = datetime.strptime(end_date, "%Y-%m-%d")
@@ -228,7 +234,13 @@ async def get_daily_plan(destination_name: str, start_date: str, end_date: str, 
         return {"error": "Failed to generate daily plan."}
 
 @app.post("/trip-images")
-async def get_trip_images(destination_name: str, trip_month: str, trip_type: str, summary: str):
+async def get_trip_images(request: Request):
+    data = await request.json()
+    destination_name = data["destination_name"]
+    trip_month = data["trip_month"]
+    trip_type = data["trip_type"]
+    summary = data["summary"]
+
     image_urls = generate_trip_images(destination_name, trip_month, trip_type, summary)
     if image_urls:
         return {"image_urls": image_urls}

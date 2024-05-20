@@ -1,0 +1,28 @@
+.dailyPlanContainer {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 1rem;
+  margin-top: 1rem;
+  overflow-x: auto;
+}
+
+.dayCard {
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 1rem;
+  background-color: #f9f9f9;
+  min-width: 200px;
+  max-width: 300px;
+  flex-shrink: 0;
+}
+
+.dayHeader {
+  font-weight: bold;
+  margin-bottom: 0.5rem;
+}
+
+.dayActivities {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}

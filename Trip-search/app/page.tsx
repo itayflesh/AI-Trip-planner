@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import axios from 'axios';
 import styles from './TripPlanner.module.css';
+import dailyPlanStyles from './DailyPlan.module.css';
 
 interface DestinationDetails {
   [key: string]: {
@@ -118,25 +119,42 @@ const TripPlannerPage = () => {
         </section>
 
         {selectedDestination ? (
-          <section className={styles.selectedDestinationSection}>
-            <h2 className={styles.sectionTitle}>Selected Destination: {selectedDestination}</h2>
-            {dailyPlan && (
-              <div className={styles.dailyPlan}>
-                <h3 className={styles.subtitle}>Daily Plan:</h3>
-                <p className={styles.dailyPlanContent}>{dailyPlan}</p>
-              </div>
-            )}
-            {tripImages.length > 0 && (
-              <div className={styles.tripImages}>
-                <h3 className={styles.subtitle}>Trip Images:</h3>
-                <div className={styles.imageGrid}>
-                  {tripImages.map((imageUrl, index) => (
-                    <img key={index} src={imageUrl} alt={`Trip Image ${index + 1}`} className={styles.image} />
+  <section className={styles.selectedDestinationSection}>
+    <h2 className={styles.sectionTitle}>Selected Destination: {selectedDestination}</h2>
+    {dailyPlan && (
+      <>
+        <h3 className={styles.subtitle}>Daily Plan:</h3>
+        <div className={dailyPlanStyles.dailyPlanContainer}>
+          {dailyPlan.split('Day').filter(Boolean).map((day, index) => {
+            const dayHeader = `Day ${index + 1}:`;
+            const activities = day.trim().split('- ').slice(1);
+            return (
+              <div key={index} className={dailyPlanStyles.dayCard}>
+                <div className={dailyPlanStyles.dayHeader}>{dayHeader}</div>
+                <div className={dailyPlanStyles.dayActivities}>
+                  {activities.map((activity, activityIndex) => (
+                    <div key={activityIndex} className={styles.destinationInfo}>
+                      - {activity.trim()}
+                    </div>
                   ))}
                 </div>
               </div>
-            )}
-          </section>
+            );
+          })}
+        </div>
+      </>
+    )}
+    {tripImages.length > 0 && (
+      <div className={styles.tripImages}>
+        <h3 className={styles.subtitle}>Trip Images:</h3>
+        <div className={styles.imageGrid}>
+          {tripImages.map((imageUrl, index) => (
+            <img key={index} src={imageUrl} alt={`Trip Image ${index + 1}`} className={styles.image} />
+          ))}
+        </div>
+      </div>
+    )}
+  </section>
         ) : (
           Object.keys(destinationDetails).length > 0 && (
             <section className={styles.destinationSection}>
@@ -145,7 +163,7 @@ const TripPlannerPage = () => {
                 {Object.entries(destinationDetails).map(([airportCode, details]) => {
                   // Remove all asterisks from the destination name
                   const destinationName = details.name.replace(/\*/g, '');
-                  
+
                   return (
                     <div key={airportCode} className={styles.destinationCard}>
                       <h3 className={styles.destinationTitle}>{destinationName}</h3>
