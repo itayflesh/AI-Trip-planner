@@ -188,23 +188,23 @@ async def get_destinations(trip_input: TripInput):
         airport_code = airport_code.split()[-1]
         destination_details[airport_code] = {"name": destination_name.strip()}
 
-    for airport_code, details in destination_details.items():
-        destination_name = details["name"]
-        flight_price = get_flight_price_insights("TLV", airport_code, start_date, end_date)
-        if flight_price is not None:
-            details["flight_price"] = flight_price
-            if flight_price > budget:
-                details["message"] = "The flight price alone exceeds the entire budget."
-            else:
-                max_hotel_price = budget - flight_price
-                hotel = find_most_expensive_hotel(destination_name, start_date, end_date, max_hotel_price, num_days)
-                if hotel:
-                    details["hotel_name"] = hotel["name"]
-                    details["hotel_price"] = hotel["total_rate"]
-                else:
-                    details["message"] = "No suitable hotels found within the remaining budget."
-        else:
-            details["message"] = "Failed to retrieve flight price insights."
+    # for airport_code, details in destination_details.items():
+    #     destination_name = details["name"]
+    #     flight_price = get_flight_price_insights("TLV", airport_code, start_date, end_date)
+    #     if flight_price is not None:
+    #         details["flight_price"] = flight_price
+    #         if flight_price > budget:
+    #             details["message"] = "The flight price alone exceeds the entire budget."
+    #         else:
+    #             max_hotel_price = budget - flight_price
+    #             hotel = find_most_expensive_hotel(destination_name, start_date, end_date, max_hotel_price, num_days)
+    #             if hotel:
+    #                 details["hotel_name"] = hotel["name"]
+    #                 details["hotel_price"] = hotel["total_rate"]
+    #             else:
+    #                 details["message"] = "No suitable hotels found within the remaining budget."
+    #     else:
+    #         details["message"] = "Failed to retrieve flight price insights."
 
     return {"destination_details": destination_details}
 
