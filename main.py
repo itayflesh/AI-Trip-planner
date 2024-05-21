@@ -28,7 +28,7 @@ openai_api_model = "gpt-3.5-turbo"
 openai = OpenAI(api_key=openai_api_key)
 
 # Set up SerpAPI API credentials
-serpapi_api_key = "696b9357afea8916abd341270a4c817638dfdc640a6e415902d317e9fe18a393"
+serpapi_api_key = "0a2ad652a0ac8e9e1374dfda565412557889af808c1fbdc431cddde17ef469f5"
 
 # Function to get destination suggestions from OpenAI ChatGPT
 def get_destination_suggestions(trip_month, trip_type):
@@ -92,42 +92,33 @@ def find_most_expensive_hotel(destination, check_in_date, check_out_date, max_pr
         "currency": "USD",
         "hl": "en",
         "gl": "il",
-        "sort_by": "3",  # Sort by lowest price
+        "sort_by": "13",  # Sort by highest rating
+        "max_price": int(max_price/num_days),  # Set the maximum price
         "api_key": serpapi_api_key
     }
-    
+
     search = GoogleSearch(params)
     results = search.get_dict()
     properties = results.get("properties", [])
-    
+
     if not properties:
         return "No hotels found for the given destination and dates."
     
-    cheapest_hotel = properties[0]
-    cheapest_price_hotel = cheapest_hotel.get("total_rate", {}).get("extracted_lowest", 0)
-    
-    if cheapest_price_hotel > max_price:
-        return "The budget is not enough for flight and hotel."
-    
-    highest_price_hotel = None
-    highest_price = 0
-    
     for property in properties:
-        price = property.get("total_rate", {})
-        extracted_lowest = price.get("extracted_lowest", 0)
-        
-        if extracted_lowest <= max_price:
-            if extracted_lowest > highest_price:
+            price = property.get("total_rate", {}).get("extracted_lowest", 0)
+            if(price <= max_price):
                 highest_price_hotel = {
-                    "name": property.get("name"),
-                    "total_rate": extracted_lowest
-                }
-                highest_price = extracted_lowest
-        else:
-            # Hotel price exceeds the maximum price, break the loop
-            break
-    
+                            "name": property.get("name"),
+                            "total_rate": price
+                        }
+                return highest_price_hotel
+            
+    highest_price_hotel = {
+                            "name":"---",
+                            "total_rate": "---"
+                        }
     return highest_price_hotel
+    # return "The budget is not enough for flight and hotel."
 
 # Function to generate daily plan using OpenAI ChatGPT
 def generate_daily_plan(destination_name, start_date, end_date, trip_type):
@@ -197,23 +188,23 @@ async def get_destinations(trip_input: TripInput):
         airport_code = airport_code.split()[-1]
         destination_details[airport_code] = {"name": destination_name.strip()}
 
-    # for airport_code, details in destination_details.items():
-    #     destination_name = details["name"]
-    #     flight_price = get_flight_price_insights("TLV", airport_code, start_date, end_date)
-    #     if flight_price is not None:
-    #         details["flight_price"] = flight_price
-    #         if flight_price > budget:
-    #             details["message"] = "The flight price alone exceeds the entire budget."
-    #         else:
-    #             max_hotel_price = budget - flight_price
-    #             hotel = find_most_expensive_hotel(destination_name, start_date, end_date, max_hotel_price, num_days)
-    #             if hotel:
-    #                 details["hotel_name"] = hotel["name"]
-    #                 details["hotel_price"] = hotel["total_rate"]
-    #             else:
-    #                 details["message"] = "No suitable hotels found within the remaining budget."
-    #     else:
-    #         details["message"] = "Failed to retrieve flight price insights."
+    for airport_code, details in destination_details.items():
+        destination_name = details["name"]
+        flight_price = get_flight_price_insights("TLV", airport_code, start_date, end_date)
+        if flight_price is not None:
+            details["flight_price"] = flight_price
+            if flight_price > budget:
+                details["message"] = "The flight price alone exceeds the entire budget."
+            else:
+                max_hotel_price = budget - flight_price
+                hotel = find_most_expensive_hotel(destination_name, start_date, end_date, max_hotel_price, num_days)
+                if hotel:
+                    details["hotel_name"] = hotel["name"]
+                    details["hotel_price"] = hotel["total_rate"]
+                else:
+                    details["message"] = "No suitable hotels found within the remaining budget."
+        else:
+            details["message"] = "Failed to retrieve flight price insights."
 
     return {"destination_details": destination_details}
 
