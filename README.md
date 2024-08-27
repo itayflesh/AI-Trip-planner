@@ -1,6 +1,9 @@
 # AI-Trip-planner
 
 ## Description
+
+https://drive.google.com/file/d/15dZ8-Lt4S3n6R3VDrhkHl1STNV79Lx30/view?usp=share_link
+
 AI-Trip-planner is an AI-powered trip planning application that helps users plan their vacations by suggesting destinations, finding flights and hotels, and creating detailed daily itineraries. This project was developed as part of an assignment to create an AI-driven trip planner using various technologies and APIs.
 
 Users input their trip details, including:
