@@ -23,12 +23,12 @@ class TripInput(BaseModel):
     trip_type: str
 
 # Set up OpenAI API credentials
-openai_api_key = "sk-proj-wQ4taTDDFhbuDrmkqIlOT3BlbkFJlJVo8Zlx0wucOcJ2atou"
+openai_api_key = "" # Add your OpenAI API key here
 openai_api_model = "gpt-3.5-turbo"
 openai = OpenAI(api_key=openai_api_key)
 
 # Set up SerpAPI API credentials
-serpapi_api_key = "0a2ad652a0ac8e9e1374dfda565412557889af808c1fbdc431cddde17ef469f5"
+serpapi_api_key = "" # Add your SerpAPI API key here
 
 # Function to get destination suggestions from OpenAI ChatGPT
 def get_destination_suggestions(trip_month, trip_type):
